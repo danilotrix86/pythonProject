@@ -50,5 +50,17 @@ for csv_file in csv_files:
                 }
             ))
 
+# Create a connection to the database
+with engine.connect() as conn:
+    # Execute a query to select all rows from the table
+    result = conn.execute(table_1.select())
+    # Fetch all rows from the result
+    rows = result.fetchall()
+    # Print the table
+    print('| X | Y1 (training func) | Y2 (training func) | Y3 (training func) | Y4 (training func) |')
+    print('|---|-------------------|-------------------|-------------------|-------------------|')
+    for row in rows:
+        print('| {} | {} | {} | {} | {} |'.format(row['X'], row['Y1 (training func)'], row['Y2 (training func)'], row['Y3 (training func)'], row['Y4 (training func)']))
+
 # Close the database connection
 engine.dispose()
