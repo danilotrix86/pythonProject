@@ -6,7 +6,7 @@ from bokeh.plotting import figure, show
 from bokeh.models import ColumnDataSource, ColorBar
 from bokeh.transform import linear_cmap
 from bokeh.layouts import column
-from bokeh.palettes import Viridis256
+from bokeh.palettes import RdBu
 
 
 class DataLoader:
@@ -263,7 +263,7 @@ class DataVisualizer:
             mapping_deviation = self.data_processor.db_handler.read_table('test_data_results')
 
             # Plot training data
-            p1 = figure(title="Training Data")
+            p1 = figure(title="Training Data" , y_range=(-50, 50))
             for col in training_data.columns[1:]:
                 p1.circle(x=training_data['x'], y=training_data[col], legend_label=f'Training Data {col}', size=5)
 
@@ -277,16 +277,19 @@ class DataVisualizer:
                 p3.line(x=ideal_functions['x'], y=ideal_functions[col], legend_label=f'Ideal Function {col}')
 
             # Plot the best ideal functions
-            p4 = figure(title="Best Ideal Functions")
+            p4 = figure(title="Best Ideal Functions", y_range=(-100, 100))
             best_four_functions = ideal_functions[['x'] + list(best_functions.values())]
             for func_name, func_label in best_functions.items():
                 p4.line(x=best_four_functions['x'], y=best_four_functions[func_label], legend_label=func_label)
 
             # Plot the test data with deviations
+            
+            print (mapping_deviation)
+            
             p5 = figure(title="Test Data with Deviation")
             source = ColumnDataSource(mapping_deviation)
-            color_mapper = linear_cmap(field_name='Delta_Y', palette=Viridis256, low=min(mapping_deviation['Delta_Y']), high=max(mapping_deviation['Delta_Y']))
-            color_bar = ColorBar(color_mapper=color_mapper['transform'], width=8,  location=(0,0))
+            color_mapper = linear_cmap(field_name='Delta_Y', palette=RdBu[9], low=min(mapping_deviation['Delta_Y']), high=max(mapping_deviation['Delta_Y']))
+            color_bar = ColorBar(color_mapper=color_mapper['transform'], width=8, location=(0, 0))
             p5.circle(x='X', y='Y', color=color_mapper, source=source, size=5)
             p5.add_layout(color_bar, 'right')
 
@@ -333,49 +336,42 @@ class BestFunctionsSelectionError(ProcessingError):
     
         
         
-        
-# Initialize the database handler with the connection string
-db_handler = DatabaseHandler('sqlite:///engine.db')
+if __name__ == '__main__':        
+    # Initialize the database handler with the connection string
+    db_handler = DatabaseHandler('sqlite:///engine.db')
 
-# Initialize the data loader with the database handler
-data_loader = DataLoader(db_handler)
+    # Initialize the data loader with the database handler
+    data_loader = DataLoader(db_handler)
 
-# Initialize the data processor with the database handler and data loader
-processor = DataProcessor(db_handler, data_loader)
+    # Initialize the data processor with the database handler and data loader
+    processor = DataProcessor(db_handler, data_loader)
 
-# Initialize the data visualizer with the database handler
-visualizer = DataVisualizer(db_handler)
+    # Initialize the data visualizer with the database handler
+    visualizer = DataVisualizer(db_handler)
 
-"""
-The load_data method of the DataProcessor class is responsible for loading 
-the training, ideal functions, and test datasets from given file paths.
-"""
-processor.load_data('dataset/train.csv', 'dataset/ideal.csv', 'dataset/test.csv')
+    """
+    The load_data method of the DataProcessor class is responsible for loading 
+    the training, ideal functions, and test datasets from given file paths.
+    """
+    processor.load_data('dataset/train.csv', 'dataset/ideal.csv', 'dataset/test.csv')
 
-"""
-The select_best_functions method of the DataProcessor class is responsible for 
-finding the best function (with least deviation from the training data) 
-for each type of data in the training dataset.
-"""
-processor.select_best_functions()
+    """
+    The select_best_functions method of the DataProcessor class is responsible for 
+    finding the best function (with least deviation from the training data) 
+    """
+    processor.select_best_functions()
 
-# Uncomment the following lines to print the best functions and max deviations
-# print("Best functions: ", processor.best_functions)
-# print("Max deviations: ", processor.max_deviations)
+    """
+    The process_test_data method of the DataProcessor class is responsible for 
+    processing the test data using the best functions selected previously.
+    """
+    processor.process_test_data()
 
-"""
-The process_test_data method of the DataProcessor class is responsible for 
-processing the test data using the best functions selected previously.
-"""
-processor.process_test_data()
 
-# Print the processed test data results from the database
-print(processor.db_handler.read_table("test_data_results"))
-
-"""
-The visualize_data method of the DataVisualizer class is responsible for 
-visualizing the processed data, best functions, and maximum deviations.
-"""
-# Call the method to visualize data
-visualizer = DataVisualizer(processor)
-visualizer.visualize_data()
+    """
+    The visualize_data method of the DataVisualizer class is responsible for 
+    visualizing the processed data, best functions, and maximum deviations.
+    """
+    # Call the method to visualize data
+    visualizer = DataVisualizer(processor)
+    visualizer.visualize_data()
