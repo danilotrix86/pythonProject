@@ -8,6 +8,49 @@ from bokeh.transform import linear_cmap
 from bokeh.layouts import column
 from bokeh.palettes import Viridis256
 
+
+class DataLoader:
+    """
+    This class is responsible for loading data from CSV files and 
+    storing it into a database using a provided DBHandler instance.
+    """
+
+    def __init__(self, db_handler):
+        """
+        Initialize DataLoader with a DBHandler instance.
+        
+        Args:
+            db_handler (DBHandler): An instance of the DBHandler class.
+        """
+        self.db_handler = db_handler
+
+    def load_csv_to_dataframe(self, path, table_name=None):
+        """
+        Load a CSV file into a pandas DataFrame. Optionally save the DataFrame into the database.
+
+        Args:
+            path (str): The path to the CSV file.
+            table_name (str, optional): The name of the table to save the data in. 
+                If None, the data is not saved to the database. Defaults to None.
+
+        Returns:
+            pandas.DataFrame: The loaded dataset.
+
+        Raises:
+            Exception: If there is an error during the dataset loading process.
+        """
+        try:
+            dataset = pd.read_csv(path)
+
+            if table_name is not None:
+                self.db_handler.load_data(dataset, table_name)
+
+            return dataset
+        except Exception as e:
+            raise Exception(f"Error occurred while loading the dataset from {path}.") from e
+
+
+
 class DatabaseHandler:
     """
     A class for handling database operations.
@@ -70,93 +113,35 @@ class DatabaseHandler:
     
 class DataProcessor:
     """
-    A class for selecting the best ideal functions and processing data.
-
-    Attributes:
-        db_handler (DatabaseHandler): An instance of the DatabaseHandler class.
-        training_path (str): The path to the training dataset.
-        ideal_functions_path (str): The path to the ideal functions dataset.
-        test_path (str): The path to the test dataset.
-        training_data (pandas.DataFrame): The training dataset.
-        ideal_functions (pandas.DataFrame): The ideal functions dataset.
-        test_data (pandas.DataFrame): The test dataset.
-        best_functions (dict): The best functions selected for each training function.
-        max_deviations (dict): The maximum deviations for each training function.
-        results (pandas.DataFrame): The processed test data results.
-
-    Methods:
-        _load_dataset(path, table_name): Load a dataset from a file and save it to the database.
-        load_data(): Load the training, ideal functions, and test datasets.
-        select_best_functions(): Select the best ideal function for each training function.
-        process_test_data(): Process the test data and save the results to the database.
+    This class is responsible for processing data and selecting the best functions.
     """
 
-    def __init__(self, db_handler, training_path, ideal_functions_path, test_path):
+    def __init__(self, db_handler, data_loader):
         """
-        Initialize the DataProcessor object.
+        Initialize the DataProcessor with a DBHandler and DataLoader instances.
 
         Args:
-            db_handler (DatabaseHandler): An instance of the DatabaseHandler class.
-            training_path (str): The path to the training dataset.
-            ideal_functions_path (str): The path to the ideal functions dataset.
-            test_path (str): The path to the test dataset.
+            db_handler (DBHandler): An instance of the DBHandler class to interact with the database.
+            data_loader (DataLoader): An instance of the DataLoader class to load data.
         """
         self.db_handler = db_handler
-        self.train_path = training_path
-        self.ideal_path = ideal_functions_path
-        self.test_path = test_path
+        self.data_loader = data_loader
         self.training_data = None
         self.ideal_functions = None
         self.test_data = None
-        self.best_functions = None
-        self.max_deviations = None
-        self.results = None
 
-    def _load_dataset(self, path, table_name):
+    def load_data(self, train_path, ideal_path, test_path):
         """
-        Load a dataset from a file and save it to the database.
+        Load the training, ideal functions, and test datasets using the DataLoader instance.
 
         Args:
-            path (str): The path to the dataset file.
-            table_name (str): The name of the table to save the data in.
-
-        Returns:
-            pandas.DataFrame: The loaded dataset.
-        
-        Raises:
-            Exception: If there is an error during the dataset loading process.
+            train_path (str): The path to the training dataset file.
+            ideal_path (str): The path to the ideal functions file.
+            test_path (str): The path to the test dataset file.
         """
-        try:
-            dataset = pd.read_csv(path)
-            self.db_handler.load_data(dataset, table_name)
-            return dataset
-        except Exception as e:
-            raise Exception(f"Error occurred while loading the dataset from {path}.") from e
-
-
-    def load_data(self):
-        """
-        Load the training, ideal functions, and test datasets.
-
-        Raises:
-            Exception: If there is an error during the dataset loading process.
-        """
-        try:
-            # reading and loading the training dataset
-            self.training_data = self._load_dataset(self.train_path, 'training_data')
-
-            # reading and loading the ideal functions
-            self.ideal_functions = self._load_dataset(self.ideal_path, 'ideal_functions')
-
-            # reading the test data
-            try:
-                self.test_data = pd.read_csv(self.test_path)
-            except Exception as e:
-                raise Exception(f"Error occurred while reading the test data from {self.test_path}.") from e
-
-        except Exception as e:
-            raise Exception("Error occurred while loading the datasets.") from e
-
+        self.training_data = self.data_loader.load_csv_to_dataframe(train_path, 'training_data')
+        self.ideal_functions = self.data_loader.load_csv_to_dataframe(ideal_path, 'ideal_functions')
+        self.test_data = self.data_loader.load_csv_to_dataframe(test_path)
 
     def select_best_functions(self):
         """
@@ -190,6 +175,8 @@ class DataProcessor:
                 best_functions[training_func] = best_function
                 max_deviations[training_func] = np.sqrt(SSDs[best_function])
 
+                
+
             # Set the best functions and the maximum deviations
             self.best_functions = best_functions
             self.max_deviations = max_deviations
@@ -217,7 +204,9 @@ class DataProcessor:
                 x, y = row['x'], row['y']
 
                 # Check against each of the selected ideal functions
+                
                 for training_func, ideal_func in self.best_functions.items():
+                    
                     # Calculate the deviation from the ideal function
                     deviation = abs(y - ideal_functions.loc[i, ideal_func])
 
@@ -343,21 +332,50 @@ class BestFunctionsSelectionError(ProcessingError):
         super().__init__(message, original_exception)
     
         
+        
+        
+# Initialize the database handler with the connection string
 db_handler = DatabaseHandler('sqlite:///engine.db')
-processor = DataProcessor(db_handler, 'dataset/train.csv', 'dataset/ideal.csv', 'dataset/test.csv')
+
+# Initialize the data loader with the database handler
+data_loader = DataLoader(db_handler)
+
+# Initialize the data processor with the database handler and data loader
+processor = DataProcessor(db_handler, data_loader)
+
+# Initialize the data visualizer with the database handler
 visualizer = DataVisualizer(db_handler)
 
-processor.load_data()
+"""
+The load_data method of the DataProcessor class is responsible for loading 
+the training, ideal functions, and test datasets from given file paths.
+"""
+processor.load_data('dataset/train.csv', 'dataset/ideal.csv', 'dataset/test.csv')
 
+"""
+The select_best_functions method of the DataProcessor class is responsible for 
+finding the best function (with least deviation from the training data) 
+for each type of data in the training dataset.
+"""
 processor.select_best_functions()
 
-print("Best functions: ", processor.best_functions)
-print("Max deviations: ", processor.max_deviations)
+# Uncomment the following lines to print the best functions and max deviations
+# print("Best functions: ", processor.best_functions)
+# print("Max deviations: ", processor.max_deviations)
 
+"""
+The process_test_data method of the DataProcessor class is responsible for 
+processing the test data using the best functions selected previously.
+"""
 processor.process_test_data()
-print (processor.db_handler.read_table("test_data_results"))
 
+# Print the processed test data results from the database
+print(processor.db_handler.read_table("test_data_results"))
 
+"""
+The visualize_data method of the DataVisualizer class is responsible for 
+visualizing the processed data, best functions, and maximum deviations.
+"""
 # Call the method to visualize data
 visualizer = DataVisualizer(processor)
 visualizer.visualize_data()
