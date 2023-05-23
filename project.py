@@ -343,33 +343,21 @@ class BestFunctionsSelectionError(ProcessingError):
         super().__init__(message, original_exception)
     
         
-        
-if __name__ == "__main__":   
-         
-    # Initialize a DatabaseHandler object with a SQLite database.
-    db_handler = DatabaseHandler('sqlite:///engine.db')
+db_handler = DatabaseHandler('sqlite:///engine.db')
+processor = DataProcessor(db_handler, 'dataset/train.csv', 'dataset/ideal.csv', 'dataset/test.csv')
+visualizer = DataVisualizer(db_handler)
 
-    # Initialize a DataProcessor object, specifying the database handler and file paths for the training, ideal functions, and test datasets.
-    processor = DataProcessor(db_handler, 'dataset/train.csv', 'dataset/ideal.csv', 'dataset/test.csv')
+processor.load_data()
 
-    # Initialize a DataVisualizer object, specifying the data processor.
-    visualizer = DataVisualizer(processor)
+processor.select_best_functions()
 
-    # Load data into the DataProcessor.
-    processor.load_data()
+print("Best functions: ", processor.best_functions)
+print("Max deviations: ", processor.max_deviations)
 
-    # Select the best functions for the data.
-    processor.select_best_functions()
+processor.process_test_data()
+print (processor.db_handler.read_table("test_data_results"))
 
-    # Print the best functions and maximum deviations.
-    print("Best functions: ", processor.best_functions)
-    print("Max deviations: ", processor.max_deviations)
 
-    # Process the test data and update the database.
-    processor.process_test_data()
-
-    # Print the results of the test data processing.
-    print (processor.db_handler.read_table("test_data_results"))
-
-    # Call the method to visualize data.
-    visualizer.visualize_data()
+# Call the method to visualize data
+visualizer = DataVisualizer(processor)
+visualizer.visualize_data()
