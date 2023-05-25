@@ -64,8 +64,7 @@ class DataVisualizer:
                 p4.line(x=best_four_functions['x'], y=best_four_functions[func_label], legend_label=func_label)
 
             # Plot the test data with deviations
-            
-            print (mapping_deviation)
+          
             
             p5 = figure(title="Test Data with Deviation")
             source = ColumnDataSource(mapping_deviation)
